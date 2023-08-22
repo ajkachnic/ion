@@ -1,0 +1,8 @@
+math := import("math")
+
+print(math.pi) // expect: 3.141592653589793
+print(math.floor(math.pi)) // expect: 3
+print(math.ceil(math.pi)) // expect: 4
+
+print(math.floor(5)) // expect: 5
+print(math.ceil(5)) // expect: 5

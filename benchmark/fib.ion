@@ -1,0 +1,18 @@
+fib := n -> {
+  if n > 1 {
+    fib(n - 1) + fib(n - 2)
+  } else {
+    n
+  }
+}
+
+start := time()
+
+print(fib(28))
+print(fib(28))
+print(fib(28))
+print(fib(28))
+print(fib(28))
+
+print("elapsed: ")
+print(time() - start)

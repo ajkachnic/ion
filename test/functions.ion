@@ -1,0 +1,12 @@
+// simple recursion!
+fib := n -> {
+  if n > 1 {
+    fib(n - 1) + fib(n - 2)
+  } else {
+    n
+  }
+}
+
+print(fib(5)) // expect: 5
+print(fib(10)) // expect: 55
+print(fib(27)) // expect: 196418

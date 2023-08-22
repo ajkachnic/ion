@@ -1,0 +1,10 @@
+json := import("json")
+
+input := "{ \"a\": 1, \"b\": [ null, 2.3, \"a string\" ] }"
+output := { a: 1, b: [ null, 2.3, "a string" ] }
+
+generatedOutput := json.parse(input)
+generatedInput := json.serialize(output)
+
+print(generatedOutput) // expect: { a: 1, b: [ null, 2.3, "a string" ] }
+print(generatedInput) // expect: {"a":1,"b":[null,2.3,"a string"]}

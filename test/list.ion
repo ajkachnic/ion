@@ -1,0 +1,11 @@
+a := [ 1, 2, 3, 4 ]
+
+b := 2
+
+print(a.0) // expect: 1
+print(a.1) // expect: 2
+print(a.{ b }) // expect: 3
+print(a.(b)) // expect: 3
+print(a.(1 + 2)) // expect: 4
+
+print(len(a)) // expect: 4
