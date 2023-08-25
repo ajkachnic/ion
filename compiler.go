@@ -590,6 +590,15 @@ func (c *Compiler) addInstruction(ins []byte) int {
 }
 
 func (c *Compiler) addConstant(value Value) int {
+	switch value := value.(type) {
+	case IntValue, FloatValue, *StringValue:
+		// lookup constants to reduce duplicate compilation
+		for i, constant := range c.constants {
+			if constant != nil && constant.Eq(value) {
+				return i
+			}
+		}
+	}
 	c.constants = append(c.constants, value)
 
 	return len(c.constants) - 1
