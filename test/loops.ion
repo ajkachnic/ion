@@ -1,0 +1,26 @@
+for (i := 0, i < 4, i = i + 1) {
+  print(i)
+}
+// expect: 0
+// expect: 1
+// expect: 2
+// expect: 3
+
+list := [ 1, 2, 3 ]
+for i in list {
+ print(i * i)
+}
+// expect: 1
+// expect: 4
+// expect: 9
+
+j := 0
+for j < 4 {
+  print(j)
+  j = j + 1
+}
+
+// expect: 0
+// expect: 1
+// expect: 2
+// expect: 3

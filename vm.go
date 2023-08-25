@@ -10,17 +10,17 @@ const StackSize = 2048
 const GlobalsSize = 65536
 
 type Frame struct {
-	fn          *FunctionValue
+	cl          *Closure
 	ip          int
 	basePointer int
 }
 
-func newFrame(fn *FunctionValue, basePointer int) *Frame {
-	return &Frame{fn: fn, ip: -1, basePointer: basePointer}
+func newFrame(cl *Closure, basePointer int) *Frame {
+	return &Frame{cl: cl, ip: -1, basePointer: basePointer}
 }
 
 func (f *Frame) instructions() Instructions {
-	return f.fn.instructions
+	return f.cl.fn.instructions
 }
 
 type VM struct {
@@ -38,7 +38,8 @@ type VM struct {
 
 func NewVM(bytecode *Bytecode, globals []Value, context *context) *VM {
 	mainFn := &FunctionValue{instructions: bytecode.instructions}
-	mainFrame := newFrame(mainFn, 0)
+	mainClosure := &Closure{fn: mainFn}
+	mainFrame := newFrame(mainClosure, 0)
 
 	frames := make([]*Frame, MaxFrames)
 	frames[0] = mainFrame
@@ -151,6 +152,13 @@ func (vm *VM) run() error {
 			if err := vm.executeCall(int(numArgs)); err != nil {
 				return err
 			}
+		case OpClosure:
+			constIndex := int(vm.readU16(true))
+			numFree := int(vm.readU8(true))
+
+			if err := vm.pushClosure(constIndex, numFree); err != nil {
+				return err
+			}
 		case OpReturnValue:
 			returnValue := vm.pop()
 
@@ -161,9 +169,40 @@ func (vm *VM) run() error {
 				return err
 			}
 
+		case OpIterate:
+			iterable, ok := vm.pop().(Iterable)
+			if !ok {
+				return fmt.Errorf("value is not iterable: %T", iterable)
+			}
+
+			iter := iterable.Iter()
+
+			if err := vm.push(iter); err != nil {
+				return err
+			}
+		case OpIterateNext:
+			iter := vm.peek().(Iterator)
+			next, empty := iter.Next()
+
+			var value = next
+
+			if next == nil {
+				value = null
+			}
+
+			if err := vm.push(value); err != nil {
+				return err
+			}
+			if err := vm.push(BoolValue(empty)); err != nil {
+				return err
+			}
 		case OpJump:
 			pos := int(vm.readU16(false))
 			vm.currentFrame().ip = pos - 1
+		case OpLoop:
+			pos := int(vm.readU16(false))
+			vm.currentFrame().ip -= pos + 1
+
 		case OpJumpNotTruthy:
 			pos := int(vm.readU16(true))
 
@@ -220,6 +259,13 @@ func (vm *VM) run() error {
 			if err := vm.push(vm.stack[frame.basePointer+int(localIndex)]); err != nil {
 				return err
 			}
+		case OpGetFree:
+			freeIndex := int(vm.readU8(true))
+			currentClosure := vm.currentFrame().cl
+
+			if err := vm.push(currentClosure.free[freeIndex]); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unknown opcode: %s", definitions[op].name)
 		}
@@ -252,11 +298,28 @@ func (vm *VM) readU8(increment bool) uint8 {
 	return value
 }
 
+func (vm *VM) pushClosure(constIndex int, numFree int) error {
+	constant := vm.constants[constIndex]
+	function, ok := constant.(FunctionValue)
+	if !ok {
+		return fmt.Errorf("not a function: %+v", constant)
+	}
+
+	free := make([]Value, numFree)
+	for i := 0; i < numFree; i++ {
+		free[i] = vm.stack[vm.sp-numFree+i]
+	}
+	vm.sp = vm.sp - numFree
+
+	closure := &Closure{fn: &function, free: free}
+	return vm.push(closure)
+}
+
 func (vm *VM) executeCall(numArgs int) error {
-	callee := vm.stack[vm.sp-1-int(numArgs)]
+	callee := vm.stack[vm.sp-1-numArgs]
 	switch callee := callee.(type) {
-	case FunctionValue:
-		return vm.callFunction(&callee, numArgs)
+	case *Closure:
+		return vm.callClosure(callee, numArgs)
 	case BuiltinFnValue:
 		args := vm.stack[vm.sp-numArgs : vm.sp]
 		result, err := (callee.fn)(args)
@@ -276,15 +339,15 @@ func (vm *VM) executeCall(numArgs int) error {
 	return nil
 }
 
-func (vm *VM) callFunction(fn *FunctionValue, numArgs int) error {
-	if fn.numParams != numArgs {
-		return fmt.Errorf("wrong number of arguments: want=%d, got=%d", fn.numParams, numArgs)
+func (vm *VM) callClosure(cl *Closure, numArgs int) error {
+	if cl.fn.numParams != numArgs {
+		return fmt.Errorf("wrong number of arguments: want=%d, got=%d", cl.fn.numParams, numArgs)
 	}
 
-	frame := newFrame(fn, vm.sp-numArgs)
+	frame := newFrame(cl, vm.sp-numArgs)
 	vm.pushFrame(frame)
 
-	vm.sp = frame.basePointer + fn.numLocals
+	vm.sp = frame.basePointer + cl.fn.numLocals
 
 	return nil
 }

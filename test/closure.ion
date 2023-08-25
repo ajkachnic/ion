@@ -1,0 +1,6 @@
+add := a -> b -> a + b
+print(add(100)(599)) // expect: 699
+
+identity := (arg) -> () -> arg
+print(identity(100)()) // expect: 100
+

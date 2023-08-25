@@ -49,6 +49,7 @@ const (
 
 	// keywords
 	breakKeyword
+	continueKeyword
 	ifKeyword
 	elseKeyword
 	forKeyword
@@ -145,6 +146,8 @@ func (t token) String() string {
 
 	case breakKeyword:
 		return "break"
+	case continueKeyword:
+		return "continue"
 	case ifKeyword:
 		return "if"
 	case elseKeyword:
@@ -421,6 +424,8 @@ func (t *tokenizer) nextToken() token {
 			return token{kind: inKeyword, pos: pos}
 		case "break":
 			return token{kind: breakKeyword, pos: pos}
+		case "continue":
+			return token{kind: continueKeyword, pos: pos}
 		case "return":
 			return token{kind: returnKeyword, pos: pos}
 		default:

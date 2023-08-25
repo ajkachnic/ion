@@ -2,13 +2,11 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"hash/fnv"
 	"math"
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type ValueType int
@@ -131,7 +129,8 @@ type FunctionValue struct {
 }
 
 func (v FunctionValue) String() string {
-	return v.instructions.String()
+	// return v.instructions.String()
+	return "function"
 }
 
 func (v FunctionValue) Eq(u Value) bool {
@@ -264,75 +263,90 @@ type Hashable interface {
 	HashKey() HashKey
 }
 
-type BuiltinValue func(args ...Value) Value
-
-func (v BuiltinValue) String() string {
-	return "[native code]"
+type Closure struct {
+	fn   *FunctionValue
+	free []Value
 }
 
-func (v BuiltinValue) Eq(u Value) bool {
+func (c *Closure) String() string {
+	return c.fn.String()
+}
+
+func (c *Closure) Eq(u Value) bool {
 	return false
 }
 
-func (v BuiltinValue) Truthy() bool {
+func (c *Closure) Truthy() bool {
 	return true
 }
 
-var Builtins = []struct {
-	name    string
-	builtin BuiltinValue
-}{
-	{
-		"len",
-		func(args ...Value) Value {
-			if len(args) != 1 {
-				// TODO: this is stupid, don't panic
-				panic("wrong number of arguments")
-			}
-
-			switch v := args[0].(type) {
-			case *StringValue:
-				return IntValue(len(string(*v)))
-			case ListValue:
-				return IntValue(len(v))
-			case ObjectValue:
-				return IntValue(len(v))
-			}
-
-			return null
-		},
-	},
-	{
-		"time",
-		func(args ...Value) Value {
-			return FloatValue(float64(time.Now().UnixMilli()) / 1000)
-		},
-	},
-	{
-		"print",
-		func(args ...Value) Value {
-			if len(args) != 1 {
-				// TODO: this is stupid, don't panic
-				panic("wrong number of arguments")
-			}
-
-			switch v := args[0].(type) {
-			case *StringValue:
-				fmt.Println(string(*v))
-			default:
-				fmt.Println(v.String())
-			}
-
-			return null
-		},
-	},
+// Iterators
+type Iterable interface {
+	Iter() Iterator
+	Value
 }
 
-func getBuiltinByName(name string) BuiltinValue {
-	for _, def := range Builtins {
-		if def.name == name {
-			return def.builtin
-		}
+type Iterator interface {
+	Next() (Value, bool)
+	Value
+}
+
+func (v ListValue) Iter() Iterator {
+	return &ListIterator{v, 0}
+}
+
+type ListIterator struct {
+	list  ListValue
+	index int
+}
+
+func (i *ListIterator) String() string {
+	return "<list iterator>"
+}
+
+func (i *ListIterator) Eq(u Value) bool {
+	return false
+}
+
+func (i *ListIterator) Truthy() bool {
+	return true
+}
+
+func (i *ListIterator) Next() (Value, bool) {
+	if i.index >= len(i.list) {
+		return nil, false
 	}
-	return nil
+	value := i.list[i.index]
+	i.index++
+	return value, true
+}
+
+func (v *StringValue) Iter() Iterator {
+	return &StringIterator{v, 0}
+}
+
+type StringIterator struct {
+	str   *StringValue
+	index int
+}
+
+func (i *StringIterator) Next() (Value, bool) {
+	if i.index >= len(*i.str) {
+		return nil, false
+	}
+	value := StringValue(string((*i.str)[i.index]))
+	i.index++
+	return &value, true
+}
+
+func (i *StringIterator) String() string {
+	return "<string iterator>"
+}
+
+func (i *StringIterator) Eq(u Value) bool {
+	return false
+}
+
+func (i *StringIterator) Truthy() bool {
+	return true
 }

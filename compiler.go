@@ -10,6 +10,7 @@ const (
 	LocalScope   symbolScope = "LOCAL"
 	GlobalScope  symbolScope = "GLOBAL"
 	BuiltinScope symbolScope = "BUILTIN"
+	FreeScope    symbolScope = "FREE"
 )
 
 type CompilationScope struct {
@@ -25,12 +26,13 @@ type Symbol struct {
 }
 
 type SymbolTable struct {
-	outer *SymbolTable
-	store map[string]Symbol
+	outer       *SymbolTable
+	store       map[string]Symbol
+	freeSymbols []Symbol
 }
 
 func NewSymbolTable() *SymbolTable {
-	return &SymbolTable{store: make(map[string]Symbol)}
+	return &SymbolTable{store: make(map[string]Symbol), freeSymbols: []Symbol{}}
 }
 
 func NewEnclosedSymbolTable(outer *SymbolTable) *SymbolTable {
@@ -39,7 +41,7 @@ func NewEnclosedSymbolTable(outer *SymbolTable) *SymbolTable {
 	return s
 }
 
-func (s SymbolTable) define(name string) Symbol {
+func (s *SymbolTable) define(name string) Symbol {
 	symbol := Symbol{name: name, index: len(s.store)}
 	if s.outer == nil {
 		symbol.scope = GlobalScope
@@ -51,18 +53,45 @@ func (s SymbolTable) define(name string) Symbol {
 	return symbol
 }
 
-func (s SymbolTable) defineBuiltin(index int, name string) Symbol {
+func (s *SymbolTable) defineBuiltin(index int, name string) Symbol {
 	symbol := Symbol{name: name, index: index, scope: BuiltinScope}
 	s.store[name] = symbol
 	return symbol
 }
 
-func (s SymbolTable) resolve(name string) (Symbol, bool) {
+func (s *SymbolTable) defineFree(original Symbol) Symbol {
+
+	s.freeSymbols = append(s.freeSymbols, original)
+
+	symbol := Symbol{
+		name:  original.name,
+		index: len(s.freeSymbols) - 1,
+		scope: FreeScope,
+	}
+
+	s.store[original.name] = symbol
+
+	// fmt.Println("free ", s.freeSymbols)
+
+	return symbol
+}
+
+func (s *SymbolTable) resolve(name string) (Symbol, bool) {
 	obj, ok := s.store[name]
 	if !ok && s.outer != nil {
 		obj, ok = s.outer.resolve(name)
-		return obj, ok
+		if !ok {
+			return obj, ok
+		}
+
+		if obj.scope == GlobalScope || obj.scope == BuiltinScope {
+			return obj, ok
+		}
+
+		free := s.defineFree(obj)
+		return free, true
 	}
+
 	return obj, ok
 }
 
@@ -74,6 +103,8 @@ func (c *Compiler) loadSymbol(s Symbol) {
 		c.emit(OpGetLocal, s.index)
 	case BuiltinScope:
 		c.emit(OpGetBuiltin, s.index)
+	case FreeScope:
+		c.emit(OpGetFree, s.index)
 	}
 }
 
@@ -171,6 +202,63 @@ func (c *Compiler) compile(node astNode, topLevel bool) error {
 				return err
 			}
 		}
+	case forExprNode:
+		loopStart := len(c.currentInstructions())
+		var increment astNode = nil
+		switch cond := node.cond.(type) {
+		case binaryNode:
+			// iterator loop
+			if cond.op == inKeyword {
+				return c.compileInLoop(node, cond)
+			} else {
+				if err := c.compile(cond, false); err != nil {
+					return err
+				}
+			}
+		case blockNode:
+			// c-style for loop
+			if len(cond.exprs) == 3 {
+				if err := c.compile(cond.exprs[0], false); err != nil {
+					return err
+				}
+				loopStart = len(c.currentInstructions())
+
+				if err := c.compile(cond.exprs[1], false); err != nil {
+					return err
+				}
+
+				increment = cond.exprs[2]
+			} else {
+				if err := c.compile(node.cond, false); err != nil {
+					return err
+				}
+			}
+		default:
+			// while loop
+			if err := c.compile(node.cond, false); err != nil {
+				return err
+			}
+		}
+
+		exitJump := c.emit(OpJumpNotTruthy, 0xffff)
+
+		if err := c.compile(node.body, false); err != nil {
+			return err
+		}
+		c.emit(OpPop)
+
+		if increment != nil {
+			if err := c.compile(increment, false); err != nil {
+				return err
+			}
+		}
+
+		c.emitLoop(loopStart)
+
+		c.patchJump(exitJump, len(c.currentInstructions()))
+
+		c.emit(OpNull)
+
 	case ifExprNode:
 		if err := c.compile(node.cond, false); err != nil {
 			return err
@@ -222,15 +310,22 @@ func (c *Compiler) compile(node astNode, topLevel bool) error {
 			c.scopes[c.scopeIndex].lastInstruction.opcode = OpReturnValue
 		}
 
+		freeSymbols := c.symbolTable.freeSymbols
 		numLocals := len(c.symbolTable.store)
+
 		instructions := c.leaveScope()
+
+		for _, s := range freeSymbols {
+			c.loadSymbol(s)
+		}
 
 		compiledFn := FunctionValue{
 			instructions: instructions,
 			numLocals:    numLocals,
 			numParams:    len(node.params),
 		}
-		c.emit(OpConstant, c.addConstant(compiledFn))
+
+		c.emit(OpClosure, c.addConstant(compiledFn), len(freeSymbols))
 
 	case fnCallNode:
 		if err := c.compile(node.fn, false); err != nil {
@@ -295,8 +390,21 @@ func (c *Compiler) compile(node astNode, topLevel bool) error {
 	case assignmentNode:
 		switch left := node.left.(type) {
 		case identifierNode:
-			// we need to define the symbol before compiling the right side (recursion)
-			symbol := c.symbolTable.define(left.payload)
+			var symbol Symbol
+			if node.isSet {
+				resolved, ok := c.symbolTable.resolve(left.payload)
+
+				if !ok {
+					return fmt.Errorf("variable %s is not defined", left.payload)
+				}
+
+				symbol = resolved
+			} else if stored, ok := c.symbolTable.store[left.payload]; ok {
+				symbol = stored
+			} else {
+				// we need to define the symbol before compiling the right side (recursion)
+				symbol = c.symbolTable.define(left.payload)
+			}
 
 			if err := c.compile(node.right, false); err != nil {
 				return nil
@@ -312,11 +420,20 @@ func (c *Compiler) compile(node astNode, topLevel bool) error {
 
 	case identifierNode:
 		symbol, ok := c.symbolTable.resolve(node.payload)
+		// fmt.Println("resolving symbol: ", node.payload)
+		// fmt.Println(c.symbolTable.freeSymbols)
 		if !ok {
 			return fmt.Errorf("unknown variable %s", node.payload)
 		}
 
 		c.loadSymbol(symbol)
+
+	case returnNode:
+		if err := c.compile(node.inner, false); err != nil {
+			return err
+		}
+
+		c.emit(OpReturnValue)
 
 	case intNode:
 		integer := IntValue(node.payload)
@@ -399,6 +516,51 @@ func (c *Compiler) emit(op Opcode, operands ...int) int {
 	c.setLastInstruction(op, pos)
 
 	return pos
+}
+
+func (c *Compiler) compileInLoop(node forExprNode, cond binaryNode) error {
+	name, ok := cond.left.(identifierNode)
+	if !ok {
+		return fmt.Errorf("expected identifier in for loop")
+	}
+
+	symbol := c.symbolTable.define(name.payload)
+
+	// actual iterator
+	if err := c.compile(cond.right, false); err != nil {
+		return err
+	}
+	c.emit(OpIterate)
+
+	loopStart := len(c.currentInstructions())
+
+	c.emit(OpIterateNext)
+
+	jump := c.emit(OpJumpNotTruthy, 0xffff)
+
+	c.emit(OpSetGlobal, symbol.index)
+
+	if err := c.compile(node.body, true); err != nil {
+		return err
+	}
+
+	c.emit(OpPop) // pop body
+
+	c.emitLoop(loopStart)
+	c.patchJump(jump, len(c.currentInstructions()))
+
+	c.emit(OpPop) // pop iterator
+	c.emit(OpPop) // pop condition
+
+	c.emit(OpNull) // pop condition
+
+	return nil
+}
+
+func (c *Compiler) emitLoop(loopStart int) {
+	offset := len(c.currentInstructions()) - loopStart
+
+	c.emit(OpLoop, offset)
 }
 
 func (c *Compiler) setLastInstruction(op Opcode, pos int) {

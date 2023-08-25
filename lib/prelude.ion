@@ -1,0 +1,36 @@
+iterator := iter -> {
+  if type(iter.next) != "function" {
+    return { err: "iterator must implement .next() method"}
+  }
+
+  return {
+    map: (func) -> {
+      return iterator({
+        next: () -> func(iter.next())
+      })
+    },
+    filter: (func) -> {
+      check := () -> {
+        next := iter.next()
+        if next == null {
+          return null
+        } else if func(next) {
+          return next
+        } else {
+          return check()
+        }
+      }
+      return iterator({
+        next: () -> check()
+      })
+    },
+    collect: (func) -> {
+      result := []
+      for next in iter {
+        result.push(next)
+      }
+      return result
+    },
+    }
+  }
+}

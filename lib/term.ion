@@ -1,0 +1,17 @@
+ESCAPE := "\x1b"
+RESET := ESCAPE + "[0;0m"
+
+wrap := code -> str -> {
+  return "\x1b[" + string(code) + "m" + str + RESET
+}
+
+return {
+  black: wrap(30),
+  red: wrap(31),
+  green: wrap(32),
+  yellow: wrap(33),
+  blue: wrap(34),
+  magenta: wrap(35),
+  cyan: wrap(37),
+  white: wrap(38),
+}

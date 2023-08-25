@@ -123,8 +123,10 @@ func repl() {
 			continue
 		}
 
-		for _, node := range ast {
-			fmt.Println(node)
+		if *debugAst {
+			for _, node := range ast {
+				fmt.Println(node)
+			}
 		}
 
 		compiler := NewCompiler(&context)
@@ -133,7 +135,9 @@ func repl() {
 
 		err = compiler.compileProgram(ast)
 
-		fmt.Println(compiler.currentInstructions())
+		if *debugBytecode {
+			fmt.Println(compiler.currentInstructions())
+		}
 
 		if err != nil {
 			fmt.Println(err.Error())

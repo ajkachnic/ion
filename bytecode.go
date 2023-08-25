@@ -43,6 +43,8 @@ func (ins Instructions) fmtInstruction(def *Definition, operands []int) string {
 		return def.name
 	case 1:
 		return fmt.Sprintf("%s %d", def.name, operands[0])
+	case 2:
+		return fmt.Sprintf("%s %d %d", def.name, operands[0], operands[1])
 	}
 
 	return fmt.Sprintf("ERROR: unhandled operandCount for %s\n", def.name)
@@ -62,9 +64,13 @@ const (
 	OpDiv
 	OpNegate
 	OpNot
+	OpClosure
 
 	OpJump
+	OpLoop // negative jump
 	OpJumpNotTruthy
+	OpIterate
+	OpIterateNext
 
 	OpTrue
 	OpFalse
@@ -81,6 +87,7 @@ const (
 	OpGetLocal
 	OpSetLocal
 	OpGetBuiltin
+	OpGetFree
 
 	OpEq
 	OpNotEq
@@ -107,9 +114,13 @@ var definitions = map[Opcode]*Definition{
 	OpCall:        {"OpCall", []int{1}},
 	OpReturnValue: {"OpReturnValue", []int{}},
 	OpReturn:      {"OpReturn", []int{}},
+	OpClosure:     {"OpClosure", []int{2, 1}},
 
 	OpJump:          {"OpJump", []int{2}},
+	OpLoop:          {"OpLoop", []int{2}},
 	OpJumpNotTruthy: {"OpJumpNotTruthy", []int{2}},
+	OpIterate:       {"OpIterate", []int{}},
+	OpIterateNext:   {"OpIterateNext", []int{}},
 
 	OpIndex:      {"OpIndex", []int{}},
 	OpGetGlobal:  {"OpGetGlobal", []int{2}},
@@ -117,6 +128,7 @@ var definitions = map[Opcode]*Definition{
 	OpGetLocal:   {"OpGetLocal", []int{1}},
 	OpSetLocal:   {"OpSetLocal", []int{1}},
 	OpGetBuiltin: {"OpGetBuiltin", []int{1}},
+	OpGetFree:    {"OpGetFree", []int{1}},
 
 	OpEq:      {"OpEq", []int{}},
 	OpNotEq:   {"OpNotEq", []int{}},

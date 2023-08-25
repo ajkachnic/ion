@@ -1,0 +1,10 @@
+a := 5
+
+update := () -> {
+  a = a + 1
+}
+
+update()
+update()
+
+print(a) // expect: 7

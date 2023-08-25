@@ -241,6 +241,33 @@ func (n ifExprNode) pos() position {
 	return n.tok.pos
 }
 
+type forExprNode struct {
+	cond astNode
+	body astNode
+	tok  *token
+}
+
+func (n forExprNode) String() string {
+	return fmt.Sprintf("for %s %s", n.cond, n.body)
+}
+
+func (n forExprNode) pos() position {
+	return n.tok.pos
+}
+
+type returnNode struct {
+	inner astNode
+	tok   *token
+}
+
+func (r returnNode) String() string {
+	return fmt.Sprintf("return %s", r.inner)
+}
+
+func (r returnNode) pos() position {
+	return r.tok.pos
+}
+
 type blockNode struct {
 	exprs []astNode
 	tok   *token
@@ -432,7 +459,7 @@ func (p *parser) parseNode() (astNode, error) {
 		switch p.peek().kind {
 		case assign, set:
 			return p.parseAssignment(node)
-		case plus, minus, times, divide, modulus, and, or, greater, less, eq, geq, leq, neq, dotdot:
+		case plus, minus, times, divide, modulus, and, or, greater, less, eq, geq, leq, neq, dotdot, inKeyword:
 			minPrec := p.lastMinPrec()
 			for {
 				if p.isEOF() {
@@ -488,6 +515,8 @@ func infixOpPrecedence(op tokenKind) int {
 	case times, divide:
 		return 50
 	case plus, minus:
+		return 45
+	case inKeyword:
 		return 40
 	case less, greater, leq, geq:
 		return 35
@@ -521,6 +550,13 @@ func (p *parser) parseUnit() (astNode, error) {
 		return boolNode{payload: false, tok: &tok}, nil
 	case nullLiteral:
 		return nullNode{tok: &tok}, nil
+	case returnKeyword:
+		node, err := p.parseNode()
+		if err != nil {
+			return nil, err
+		}
+
+		return returnNode{inner: node, tok: &tok}, nil
 	case identifier:
 		if p.peek().kind == singleArrow {
 			return p.parseFunctionLiteral(tok)
@@ -675,11 +711,50 @@ func (p *parser) parseUnit() (astNode, error) {
 			return p.parseFunctionLiteral(tok)
 		}
 
-		// if len(exprs) == 1 {
-		// 	return exprs[0], nil
+		return blockNode{exprs: exprs, tok: &tok}, nil
+	case forKeyword:
+		p.pushMinPrec(0)
+		defer p.popMinPrec()
+
+		cond, err := p.parseNode()
+
+		if err != nil {
+			return nil, err
+		}
+
+		if p.peek().kind != leftBrace {
+			return nil, parseError{
+				reason: fmt.Sprintf("Expected block after for loop condition"),
+				pos:    p.peek().pos,
+			}
+		}
+
+		body, err := p.parseNode()
+
+		if err != nil {
+			return nil, err
+		}
+
+		return forExprNode{cond: cond, body: body, tok: &tok}, nil
+
+		// switch cond := cond.(type) {
+		// // iterator loop
+		// case binaryNode:
+		// 	if cond.op != inKeyword {
+		// 		return nil, parseError{
+		// 			reason: fmt.Sprintf("Expected 'in' after for keyword"),
+		// 			pos:    p.peek().pos,
+		// 		}
+		// 	}
+		// case blockNode:
+		// 	// while loop
+		// 	if len(cond.exprs) == 1 {
+		// 	}
+		// 	// c-style for loop
+		// 	if len(cond.exprs) == 3 {
+		// 	}
 		// }
 
-		return blockNode{exprs: exprs, tok: &tok}, nil
 	case ifKeyword:
 		p.pushMinPrec(0)
 		defer p.popMinPrec()
