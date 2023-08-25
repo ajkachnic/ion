@@ -65,15 +65,15 @@ func runFile(path string) {
 	context.LoadBuiltins()
 
 	compiler := NewCompiler(&context)
-	err = compiler.compileProgram(ast)
+	e := compiler.compileProgram(ast)
 	globals := make([]Value, GlobalsSize)
 
 	if *debugBytecode {
 		fmt.Println(compiler.bytecode().instructions)
 	}
 
-	if err != nil {
-		fmt.Println(err.Error())
+	if e != nil {
+		fmt.Println(e.ErrorWithContext(string(content)))
 		os.Exit(1)
 	}
 
@@ -133,14 +133,14 @@ func repl() {
 		compiler.symbolTable = symbolTable
 		compiler.constants = constants
 
-		err = compiler.compileProgram(ast)
+		e := compiler.compileProgram(ast)
 
 		if *debugBytecode {
 			fmt.Println(compiler.currentInstructions())
 		}
 
-		if err != nil {
-			fmt.Println(err.Error())
+		if e != nil {
+			fmt.Println(e.ErrorWithContext(text))
 			continue
 		}
 

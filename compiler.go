@@ -2,7 +2,52 @@ package main
 
 import (
 	"fmt"
+	"strings"
 )
+
+type compileError struct {
+	reason string
+	position
+}
+
+func (e compileError) Error() string {
+	return fmt.Sprintf("Compile error %s: %s", e.position, e.reason)
+}
+
+const LINE_CONTEXT = 5
+
+func (e compileError) ErrorWithContext(source string) string {
+	builder := strings.Builder{}
+	sourceLines := strings.Split(source, "\n")
+	line := e.position.line - 1  // index at 0
+	column := e.position.col - 1 // index at 0
+
+	topContext := LINE_CONTEXT
+	if line < LINE_CONTEXT {
+		topContext = line
+	}
+
+	for i, content := range sourceLines[line-topContext : line] {
+		builder.WriteString(fmt.Sprintf("\x1b[2;90m%3d|\x1b[0;0m %s\n", line+1-topContext+i, content))
+	}
+
+	builder.WriteString(fmt.Sprintf("\x1b[2;90m%3d|\x1b[0;0m ", line+1))
+
+	builder.WriteString(sourceLines[line][0:column])
+	builder.WriteString("\x1b[31m")
+	builder.WriteByte(sourceLines[line][column])
+	builder.WriteString("\x1b[0m")
+	builder.WriteString(sourceLines[line][column+1:])
+	builder.WriteByte('\n')
+
+	builder.WriteString(strings.Repeat(" ", column+5))
+	builder.WriteString("\x1b[31m^\x1b[0m\n")
+	builder.WriteString("\x1b[31m")
+	builder.WriteString(e.reason)
+	builder.WriteString("\x1b[0;0m")
+
+	return builder.String()
+}
 
 type symbolScope string
 
@@ -180,7 +225,7 @@ func (c *Compiler) currentInstructions() Instructions {
 	return c.scopes[c.scopeIndex].instructions
 }
 
-func (c *Compiler) compileProgram(ast []astNode) error {
+func (c *Compiler) compileProgram(ast []astNode) *compileError {
 	for _, node := range ast {
 		if err := c.compile(node, true); err != nil {
 			return err
@@ -190,7 +235,7 @@ func (c *Compiler) compileProgram(ast []astNode) error {
 	return nil
 }
 
-func (c *Compiler) compile(node astNode, topLevel bool) error {
+func (c *Compiler) compile(node astNode, topLevel bool) *compileError {
 	switch node := node.(type) {
 	case blockNode:
 		for i, e := range node.exprs {
@@ -371,7 +416,10 @@ func (c *Compiler) compile(node astNode, topLevel bool) error {
 		case geq:
 			c.emit(OpGeq)
 		default:
-			return fmt.Errorf("unknown operator %s", token{kind: node.op})
+			return &compileError{
+				reason:   fmt.Sprintf("unknown operator %s", token{kind: node.op}),
+				position: node.pos(),
+			}
 		}
 	case unaryNode:
 		if err := c.compile(node.right, false); err != nil {
@@ -384,7 +432,10 @@ func (c *Compiler) compile(node astNode, topLevel bool) error {
 		case not:
 			c.emit(OpNot)
 		default:
-			return fmt.Errorf("unknown operator %s", token{kind: node.op})
+			return &compileError{
+				reason:   fmt.Sprintf("unknown unary operator: %s", token{kind: node.op}),
+				position: node.pos(),
+			}
 		}
 
 	case assignmentNode:
@@ -395,7 +446,10 @@ func (c *Compiler) compile(node astNode, topLevel bool) error {
 				resolved, ok := c.symbolTable.resolve(left.payload)
 
 				if !ok {
-					return fmt.Errorf("variable %s is not defined", left.payload)
+					return &compileError{
+						reason:   "variable is not defined",
+						position: left.pos(),
+					}
 				}
 
 				symbol = resolved
@@ -407,7 +461,7 @@ func (c *Compiler) compile(node astNode, topLevel bool) error {
 			}
 
 			if err := c.compile(node.right, false); err != nil {
-				return nil
+				return err
 			}
 			if symbol.scope == GlobalScope {
 				c.emit(OpSetGlobal, symbol.index)
@@ -415,7 +469,10 @@ func (c *Compiler) compile(node astNode, topLevel bool) error {
 				c.emit(OpSetLocal, symbol.index)
 			}
 		default:
-			return fmt.Errorf("unknown assignment target %s", left)
+			return &compileError{
+				reason:   fmt.Sprintf("unknown assignment target: %s", left),
+				position: left.pos(),
+			}
 		}
 
 	case identifierNode:
@@ -423,7 +480,10 @@ func (c *Compiler) compile(node astNode, topLevel bool) error {
 		// fmt.Println("resolving symbol: ", node.payload)
 		// fmt.Println(c.symbolTable.freeSymbols)
 		if !ok {
-			return fmt.Errorf("unknown variable %s", node.payload)
+			return &compileError{
+				reason:   fmt.Sprintf("unknown variable: %s", node.payload),
+				position: node.pos(),
+			}
 		}
 
 		c.loadSymbol(symbol)
@@ -488,7 +548,10 @@ func (c *Compiler) compile(node astNode, topLevel bool) error {
 
 		c.emit(OpIndex)
 	default:
-		return fmt.Errorf("unknown node: %s", node.String())
+		return &compileError{
+			reason:   fmt.Sprintf("unknown node: %s", node.String()),
+			position: node.pos(),
+		}
 	}
 
 	if topLevel {
@@ -518,10 +581,13 @@ func (c *Compiler) emit(op Opcode, operands ...int) int {
 	return pos
 }
 
-func (c *Compiler) compileInLoop(node forExprNode, cond binaryNode) error {
+func (c *Compiler) compileInLoop(node forExprNode, cond binaryNode) *compileError {
 	name, ok := cond.left.(identifierNode)
 	if !ok {
-		return fmt.Errorf("expected identifier in for loop")
+		return &compileError{
+			reason:   "expected identifier in for..in loop",
+			position: cond.left.pos(),
+		}
 	}
 
 	symbol := c.symbolTable.define(name.payload)

@@ -191,7 +191,7 @@ func newTokenizer(source string) tokenizer {
 		index:    0,
 		filename: "<input>",
 		line:     1,
-		col:      1,
+		col:      0,
 	}
 }
 
@@ -209,7 +209,7 @@ func (t *tokenizer) next() rune {
 
 	if char == '\n' {
 		t.line++
-		t.col = 1
+		t.col = 0
 	} else {
 		t.col++
 	}
