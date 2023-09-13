@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const common = @import("common.zig");
+
 const keywords = std.ComptimeStringMap(Kind, .{
     .{ "break", .breakKeyword },
     .{ "continue", .continueKeyword },
@@ -16,6 +18,7 @@ const keywords = std.ComptimeStringMap(Kind, .{
 
 pub const Kind = enum {
     comment,
+    eof,
 
     // language tokens
     comma,
@@ -83,7 +86,7 @@ const Position = struct {
     ) !void {
         _ = fmt;
         _ = options;
-        try writer.print("[{}:{}]", self.line, self.column);
+        try writer.print("[{}:{}]", .{ self.line, self.column });
     }
 };
 
@@ -95,6 +98,7 @@ pub const Token = struct {
     pub fn string(self: Token) []const u8 {
         return switch (self.kind) {
             .comma => ",",
+            .eof => "EOF",
             .dot => ".",
             .dotdot => "..",
             .colon => ":",
@@ -364,7 +368,7 @@ pub const Tokenizer = struct {
         }
     }
 
-    pub fn tokenize(t: *Tokenizer, tokens: *std.ArrayList(Token)) !void {
+    pub fn tokenize(t: *Tokenizer, tokens: *std.ArrayList(Token)) void {
         // check for shebang and skip it
         if (!t.isEOF() and t.peek() == '#' and t.peekAhead(1) == '!') {
             _ = t.readUntil('\n');
@@ -385,13 +389,13 @@ pub const Tokenizer = struct {
 
             // separate expressions
             if ((last.kind != .leftParen and last.kind != .leftBracket and last.kind != .leftBrace and last.kind != .comma) and (ch.kind == .identifier or ch.kind == .rightBracket or ch.kind == .rightBrace)) {
-                try tokens.append(Token{ .kind = .comma, .pos = t.position() });
+                tokens.append(Token{ .kind = .comma, .pos = t.position() }) catch common.oom();
             }
 
             if (ch.kind == .comment) {
                 ch = last;
             } else {
-                try tokens.append(ch);
+                tokens.append(ch) catch common.oom();
             }
 
             while (!t.isEOF() and isSpace(t.peek())) {
@@ -399,7 +403,7 @@ pub const Tokenizer = struct {
                     switch (ch.kind) {
                         // if we hit a toke nthat can end a statement, insert a comma
                         .rightParen, .rightBrace, .rightBracket, .identifier, .numberLiteral, .stringLiteral, .trueLiteral, .falseLiteral, .nullLiteral => {
-                            try tokens.append(Token{ .kind = .comma, .pos = t.position() });
+                            tokens.append(Token{ .kind = .comma, .pos = t.position() }) catch common.oom();
                         },
                         else => {},
                     }
@@ -414,8 +418,12 @@ pub const Tokenizer = struct {
         }
 
         if (last.kind != .comma) {
-            try tokens.append(Token{ .kind = .comma, .pos = t.position() });
+            tokens.append(
+                Token{ .kind = .comma, .pos = t.position() },
+            ) catch common.oom();
         }
+
+        tokens.append(Token{ .kind = .eof, .pos = t.position() }) catch common.oom();
     }
 };
 
