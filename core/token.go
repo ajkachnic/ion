@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"fmt"
@@ -9,66 +9,67 @@ import (
 type tokenKind int
 
 const (
-	unknown tokenKind = iota
-	comment
+	UNKNOWN tokenKind = iota
+	COMMENT
 
 	// language tokens
-	comma
-	dot
-	dotdot
-	colon
-	leftParen
-	rightParen
-	leftBracket
-	rightBracket
-	leftBrace
-	rightBrace
-	assign // :=
-	set    // =
-	singleArrow
-	doubleArrow
+	COMMA
+	DOT
+	DOTDOT
+	COLON
+	LEFT_PAREN
+	RIGHT_PAREN
+	LEFT_BRACKET
+	RIGHT_BRACKET
+	LEFT_BRACE
+	RIGHT_BRACE
+	ASSIGN // :=
+	SET    // =
+	SINGLE_ARROW
+	DOUBLE_ARROW
 
 	// binary operators
-	plus
-	minus
-	times
-	divide
-	modulus
-	and
-	or
-	greater
-	less
-	eq
-	geq
-	leq
-	neq
+	PLUS
+	MINUS
+	TIMES
+	DIVIDE
+	MODULUS
+	AND
+	OR
+	GREATER
+	LESS
+	EQ
+	GEQ
+	LEQ
+	NEQ
 
 	// unary operators
-	not
-	negate
+	NOT
+	NEGATE
 
 	// keywords
-	breakKeyword
-	continueKeyword
-	ifKeyword
-	elseKeyword
-	forKeyword
-	inKeyword
-	returnKeyword
+	BREAK_KEYWORD
+	CONTINUE_KEYWORD
+	IF_KEYWORD
+	ELSE_KEYWORD
+	FOR_KEYWORD
+	IN_KEYWORD
+	RETURN_KEYWORD
 
 	// literals
-	identifier
-	trueLiteral
-	falseLiteral
-	stringLiteral
-	numberLiteral
-	nullLiteral
+	IDENTIFIER
+	TRUE_LITERAL
+	FALSE_LITERAL
+	STRING_LITERAL
+	NUMBER_LITERAL
+	NULL_LITERAL
 )
 
 type position struct {
 	line     int
 	col      int
 	filename string
+	Offset   int
 }
 
 func (p position) String() string {
@@ -76,101 +77,102 @@ func (p position) String() string {
 }
 
 type token struct {
-	kind    tokenKind
-	pos     position
-	payload string
+	Kind    tokenKind
+	Pos     position
+	Payload string
+	Length  uint
 }
 
 func (t token) String() string {
-	switch t.kind {
-	case comma:
+	switch t.Kind {
+	case COMMA:
 		return ","
-	case dot:
+	case DOT:
 		return "."
-	case dotdot:
+	case DOTDOT:
 		return ".."
-	case colon:
+	case COLON:
 		return ":"
-	case leftParen:
+	case LEFT_PAREN:
 		return "("
-	case rightParen:
+	case RIGHT_PAREN:
 		return ")"
-	case leftBracket:
+	case LEFT_BRACKET:
 		return "["
-	case rightBracket:
+	case RIGHT_BRACKET:
 		return "]"
-	case leftBrace:
+	case LEFT_BRACE:
 		return "{"
-	case rightBrace:
+	case RIGHT_BRACE:
 		return "}"
-	case assign:
+	case ASSIGN:
 		return ":="
-	case set:
+	case SET:
 		return "="
-	case singleArrow:
+	case SINGLE_ARROW:
 		return "->"
-	case doubleArrow:
+	case DOUBLE_ARROW:
 		return "=>"
 
-	case plus:
+	case PLUS:
 		return "+"
-	case minus:
+	case MINUS:
 		return "-"
-	case times:
+	case TIMES:
 		return "*"
-	case divide:
+	case DIVIDE:
 		return "/"
-	case modulus:
+	case MODULUS:
 		return "%"
-	case and:
+	case AND:
 		return "&&"
-	case or:
+	case OR:
 		return "||"
-	case greater:
+	case GREATER:
 		return ">"
-	case less:
+	case LESS:
 		return "<"
-	case eq:
+	case EQ:
 		return "=="
-	case geq:
+	case GEQ:
 		return ">="
-	case leq:
+	case LEQ:
 		return "<="
-	case neq:
+	case NEQ:
 		return "!="
 
-	case not:
+	case NOT:
 		return "!"
-	case negate:
+	case NEGATE:
 		return "-"
 
-	case breakKeyword:
+	case BREAK_KEYWORD:
 		return "break"
-	case continueKeyword:
+	case CONTINUE_KEYWORD:
 		return "continue"
-	case ifKeyword:
+	case IF_KEYWORD:
 		return "if"
-	case elseKeyword:
+	case ELSE_KEYWORD:
 		return "else"
-	case forKeyword:
+	case FOR_KEYWORD:
 		return "for"
-	case inKeyword:
+	case IN_KEYWORD:
 		return "in"
-	case returnKeyword:
+	case RETURN_KEYWORD:
 		return "return"
 
-	case identifier:
-		return fmt.Sprintf("var(%s)", t.payload)
-	case trueLiteral:
+	case IDENTIFIER:
+		return fmt.Sprintf("var(%s)", t.Payload)
+	case TRUE_LITERAL:
 		return "true"
-	case falseLiteral:
+	case FALSE_LITERAL:
 		return "false"
-	case nullLiteral:
+	case NULL_LITERAL:
 		return "null"
-	case stringLiteral:
-		return fmt.Sprintf("string(%s)", t.payload)
-	case numberLiteral:
-		return fmt.Sprintf("number(%s)", t.payload)
+	case STRING_LITERAL:
+		return fmt.Sprintf("string(%s)", t.Payload)
+	case NUMBER_LITERAL:
+		return fmt.Sprintf("number(%s)", t.Payload)
 
 	default:
 		return "<unknown>"
@@ -185,7 +187,7 @@ type tokenizer struct {
 	col      int
 }
 
-func newTokenizer(source string) tokenizer {
+func NewTokenizer(source string) tokenizer {
 	return tokenizer{
 		source:   []rune(source),
 		index:    0,
@@ -275,9 +277,14 @@ func (t *tokenizer) readNumber() string {
 }
 
 func (t *tokenizer) pos() position {
+	offset := t.index
+	if offset > 0 {
+		offset -= 1
+	}
 	return position{
 		line:     t.line,
 		col:      t.col,
+		Offset:   offset,
 		filename: t.filename,
 	}
 }
@@ -287,94 +294,96 @@ func (t *tokenizer) nextToken() token {
 
 	switch ch {
 	case ',':
-		return token{kind: comma, pos: t.pos()}
+		return token{Kind: COMMA, Pos: t.pos(), Length: 1}
 	case '.':
 		if !t.isEOF() && t.peek() == '.' {
 			pos := t.pos()
 			_ = t.next()
 
-			return token{kind: dotdot, pos: pos}
+			return token{Kind: DOTDOT, Pos: pos, Length: 1}
 		}
-		return token{kind: dot, pos: t.pos()}
+		return token{Kind: DOT, Pos: t.pos(), Length: 1}
 	case '(':
-		return token{kind: leftParen, pos: t.pos()}
+		return token{Kind: LEFT_PAREN, Pos: t.pos(), Length: 1}
 	case ')':
-		return token{kind: rightParen, pos: t.pos()}
+		return token{Kind: RIGHT_PAREN, Pos: t.pos(), Length: 1}
 	case '[':
-		return token{kind: leftBracket, pos: t.pos()}
+		return token{Kind: LEFT_BRACKET, Pos: t.pos(), Length: 1}
 	case ']':
-		return token{kind: rightBracket, pos: t.pos()}
+		return token{Kind: RIGHT_BRACKET, Pos: t.pos(), Length: 1}
 	case '{':
-		return token{kind: leftBrace, pos: t.pos()}
+		return token{Kind: LEFT_BRACE, Pos: t.pos(), Length: 1}
 	case '}':
-		return token{kind: rightBrace, pos: t.pos()}
+		return token{Kind: RIGHT_BRACE, Pos: t.pos()}
 	case ':':
 		if !t.isEOF() && t.peek() == '=' {
 			pos := t.pos()
 			t.next()
-			return token{kind: assign, pos: pos}
+			return token{Kind: ASSIGN, Pos: pos, Length: 2}
 		}
-		return token{kind: colon, pos: t.pos()}
+		return token{Kind: COLON, Pos: t.pos(), Length: 1}
 
 	case '=':
 		if !t.isEOF() && t.peek() == '>' {
 			pos := t.pos()
 			t.next()
-			return token{kind: doubleArrow, pos: pos}
+			return token{Kind: DOUBLE_ARROW, Pos: pos, Length: 2}
 		} else if !t.isEOF() && t.peek() == '=' {
 			pos := t.pos()
 			t.next()
-			return token{kind: eq, pos: pos}
+			return token{Kind: EQ, Pos: pos, Length: 1}
 		}
-		return token{kind: set, pos: t.pos()}
+		return token{Kind: SET, Pos: t.pos(), Length: 1}
 	case '>':
 		if !t.isEOF() && t.peek() == '=' {
 			pos := t.pos()
 			t.next()
-			return token{kind: geq, pos: pos}
+			return token{Kind: GEQ, Pos: pos, Length: 2}
 		}
-		return token{kind: greater, pos: t.pos()}
+		return token{Kind: GREATER, Pos: t.pos(), Length: 1}
 	case '<':
 		if !t.isEOF() && t.peek() == '=' {
 			pos := t.pos()
 			t.next()
-			return token{kind: leq, pos: pos}
+			return token{Kind: LEQ, Pos: pos, Length: 2}
 		}
-		return token{kind: less, pos: t.pos()}
+		return token{Kind: LESS, Pos: t.pos(), Length: 1}
 	case '!':
 		if !t.isEOF() && t.peek() == '=' {
 			pos := t.pos()
 			t.next()
-			return token{kind: neq, pos: pos}
+			return token{Kind: NEQ, Pos: pos, Length: 2}
 		}
-		return token{kind: not, pos: t.pos()}
+		return token{Kind: NOT, Pos: t.pos(), Length: 1}
 
 	case '+':
-		return token{kind: plus, pos: t.pos()}
+		return token{Kind: PLUS, Pos: t.pos(), Length: 1}
 	case '-':
 		if !t.isEOF() && t.peek() == '>' {
 			pos := t.pos()
 			t.next()
-			return token{kind: singleArrow, pos: pos}
+			return token{Kind: SINGLE_ARROW, Pos: pos, Length: 2}
 		}
-		return token{kind: minus, pos: t.pos()}
+		return token{Kind: MINUS, Pos: t.pos(), Length: 1}
 	case '*':
-		return token{kind: times, pos: t.pos()}
+		return token{Kind: TIMES, Pos: t.pos(), Length: 1}
 	case '/':
 		if !t.isEOF() && t.peek() == '/' {
 			pos := t.pos()
 			t.next()
-			commentString := strings.TrimSpace(t.readUntil('\n'))
-			return token{kind: comment, pos: pos, payload: commentString}
+			commentString := t.readUntil('\n')
+			return token{Kind: COMMENT, Pos: pos, Payload: commentString, Length: 2 + uint(len(commentString))}
 		}
-		return token{kind: divide, pos: t.pos()}
+		return token{Kind: DIVIDE, Pos: t.pos(), Length: 1}
 	case '%':
-		return token{kind: modulus, pos: t.pos()}
+		return token{Kind: MODULUS, Pos: t.pos()}
 	case '"':
+		length := uint(0)
 		pos := t.pos()
 		builder := strings.Builder{}
 		for !t.isEOF() && t.peek() != '"' {
 			ch := t.next()
+			length += 1
 			if ch == '\\' {
 				builder.WriteRune(ch)
 				if t.isEOF() {
@@ -388,48 +397,50 @@ func (t *tokenizer) nextToken() token {
 
 		if t.isEOF() {
 			return token{
-				kind:    stringLiteral,
-				pos:     pos,
-				payload: builder.String(),
+				Kind:    STRING_LITERAL,
+				Pos:     pos,
+				Payload: builder.String(),
+				Length:  length,
 			}
 		}
 
 		t.next()
 		return token{
-			kind:    stringLiteral,
-			pos:     pos,
-			payload: builder.String(),
+			Kind:    STRING_LITERAL,
+			Pos:     pos,
+			Payload: builder.String(),
+			Length:  length + 1,
 		}
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		pos := t.pos()
 		payload := string(ch) + t.readNumber()
-		return token{kind: numberLiteral, pos: pos, payload: payload}
+		return token{Kind: NUMBER_LITERAL, Pos: pos, Payload: payload, Length: uint(len(payload))}
 	default:
 		pos := t.pos()
 		payload := string(ch) + t.readIdentifier()
 		switch payload {
 		case "true":
-			return token{kind: trueLiteral, pos: pos}
+			return token{Kind: TRUE_LITERAL, Pos: pos, Length: 4}
 		case "false":
-			return token{kind: falseLiteral, pos: pos}
+			return token{Kind: FALSE_LITERAL, Pos: pos, Length: 5}
 		case "null":
-			return token{kind: nullLiteral, pos: pos}
+			return token{Kind: NULL_LITERAL, Pos: pos, Length: 4}
 		case "if":
-			return token{kind: ifKeyword, pos: pos}
+			return token{Kind: IF_KEYWORD, Pos: pos, Length: 2}
 		case "else":
-			return token{kind: elseKeyword, pos: pos}
+			return token{Kind: ELSE_KEYWORD, Pos: pos, Length: 4}
 		case "for":
-			return token{kind: forKeyword, pos: pos}
+			return token{Kind: FOR_KEYWORD, Pos: pos, Length: 3}
 		case "in":
-			return token{kind: inKeyword, pos: pos}
+			return token{Kind: IN_KEYWORD, Pos: pos, Length: 2}
 		case "break":
-			return token{kind: breakKeyword, pos: pos}
+			return token{Kind: BREAK_KEYWORD, Pos: pos, Length: 5}
 		case "continue":
-			return token{kind: continueKeyword, pos: pos}
+			return token{Kind: CONTINUE_KEYWORD, Pos: pos, Length: 8}
 		case "return":
-			return token{kind: returnKeyword, pos: pos}
+			return token{Kind: RETURN_KEYWORD, Pos: pos, Length: 8}
 		default:
-			return token{kind: identifier, pos: pos, payload: payload}
+			return token{Kind: IDENTIFIER, Pos: pos, Payload: payload, Length: uint(len(payload))}
 		}
 	}
 }
@@ -450,23 +461,23 @@ func (t *tokenizer) Tokenize() []token {
 		t.next()
 	}
 
-	last := token{kind: comma}
+	last := token{Kind: COMMA}
 
 	for !t.isEOF() {
 		next := t.nextToken()
 
 		// separate expressions
-		if (last.kind != leftParen && last.kind != leftBracket &&
-			last.kind != leftBrace && last.kind != comma) &&
-			(next.kind == rightParen || next.kind == rightBracket ||
-				next.kind == rightBrace) {
+		if (last.Kind != LEFT_PAREN && last.Kind != LEFT_BRACKET &&
+			last.Kind != LEFT_BRACE && last.Kind != COMMA) &&
+			(next.Kind == RIGHT_PAREN || next.Kind == RIGHT_BRACKET ||
+				next.Kind == RIGHT_BRACE) {
 			tokens = append(tokens, token{
-				kind: comma,
-				pos:  t.pos(),
+				Kind: COMMA,
+				Pos:  t.pos(),
 			})
 		}
 
-		if next.kind == comment {
+		if next.Kind == COMMENT {
 			next = last
 		} else {
 			tokens = append(tokens, next)
@@ -475,11 +486,11 @@ func (t *tokenizer) Tokenize() []token {
 		for !t.isEOF() && unicode.IsSpace(t.peek()) {
 			if t.peek() == '\n' {
 				// if we hit a token that can end a statement, insert a comma
-				switch next.kind {
-				case rightParen, rightBrace, rightBracket, identifier, numberLiteral, stringLiteral, trueLiteral, falseLiteral, nullLiteral:
+				switch next.Kind {
+				case RIGHT_PAREN, RIGHT_BRACE, RIGHT_BRACKET, IDENTIFIER, NUMBER_LITERAL, STRING_LITERAL, TRUE_LITERAL, FALSE_LITERAL, NULL_LITERAL:
 					next = token{
-						kind: comma,
-						pos:  t.pos(),
+						Kind: COMMA,
+						Pos:  t.pos(),
 					}
 					tokens = append(tokens, next)
 				}
@@ -487,15 +498,15 @@ func (t *tokenizer) Tokenize() []token {
 			t.next()
 		}
 
-		if next.kind != comment {
+		if next.Kind != COMMENT {
 			last = next
 		}
 	}
 
-	if last.kind != comma {
+	if last.Kind != COMMA {
 		tokens = append(tokens, token{
-			kind: comma,
-			pos:  t.pos(),
+			Kind: COMMA,
+			Pos:  t.pos(),
 		})
 	}
 

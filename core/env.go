@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"bytes"
@@ -10,10 +10,10 @@ import (
 	"strings"
 )
 
-func (c *context) requireArgLen(fnName string, args []Value, count int) *runtimeError {
+func (c *Context) RequireArgLen(fnName string, args []Value, count int) *RuntimeError {
 	if len(args) < count {
-		return &runtimeError{
-			reason: fmt.Sprintf("%s requires %d arguments, got %d", fnName, count, len(args)),
+		return &RuntimeError{
+			Reason: fmt.Sprintf("%s requires %d arguments, got %d", fnName, count, len(args)),
 		}
 	}
 
@@ -32,53 +32,53 @@ func (e stackEntry) String() string {
 	return fmt.Sprintf("  in anonymous fn %s", e.position)
 }
 
-type runtimeError struct {
-	reason string
+type RuntimeError struct {
+	Reason string
 	position
 	stackTrace []stackEntry
 }
 
-func (e *runtimeError) Error() string {
+func (e *RuntimeError) Error() string {
 	trace := make([]string, len(e.stackTrace))
 	for i, entry := range e.stackTrace {
 		trace[i] = entry.String()
 	}
-	return fmt.Sprintf("Runtime error %s: %s\n%s", e.position, e.reason, strings.Join(trace, "\n"))
+	return fmt.Sprintf("Runtime error %s: %s\n%s", e.position, e.Reason, strings.Join(trace, "\n"))
 }
 
-type context struct {
+type Context struct {
 	// directory containing the root file of this context, used for loading
 	// other modules with relative paths / URLs
-	rootPath string
+	RootPath string
 
-	builtins  []BuiltinFnValue
-	modules   []module
-	importMap map[string]Value
+	Builtins  []BuiltinFnValue
+	Modules   []module
+	ImportMap map[string]Value
 }
 
-func NewContext(rootPath string) context {
-	return context{
-		rootPath:  rootPath,
-		builtins:  []BuiltinFnValue{},
-		modules:   []module{},
-		importMap: make(map[string]Value),
+func NewContext(rootPath string) Context {
+	return Context{
+		RootPath:  rootPath,
+		Builtins:  []BuiltinFnValue{},
+		Modules:   []module{},
+		ImportMap: make(map[string]Value),
 	}
 }
 
-type builtinFn func([]Value) (Value, *runtimeError)
+type builtinFn func([]Value) (Value, *RuntimeError)
 
 type BuiltinFnValue struct {
-	name string
-	fn   builtinFn
+	Name string
+	Fn   builtinFn
 }
 
 func (v BuiltinFnValue) String() string {
-	return fmt.Sprintf("%s := () -> { <native fn> }", v.name)
+	return fmt.Sprintf("%s := () -> { <native fn> }", v.Name)
 }
 
 func (v BuiltinFnValue) Eq(u Value) bool {
 	if w, ok := u.(BuiltinFnValue); ok {
-		return v.name == w.name
+		return v.Name == w.Name
 	}
 	return false
 }
@@ -87,15 +87,15 @@ func (v BuiltinFnValue) Truthy() bool {
 	return true
 }
 
-func (c *context) LoadFunc(name string, fn builtinFn) {
-	c.builtins = append(c.builtins, BuiltinFnValue{
-		name: name,
-		fn:   fn,
+func (c *Context) LoadFunc(name string, fn builtinFn) {
+	c.Builtins = append(c.Builtins, BuiltinFnValue{
+		Name: name,
+		Fn:   fn,
 	})
 }
 
-func (c *context) LoadBuiltins() {
-	c.LoadModules()
+func (c *Context) LoadBuiltins() {
+	// c.LoadModules()
 
 	c.LoadFunc("int", c.builtinInt)
 	c.LoadFunc("float", c.builtinFloat)
@@ -106,8 +106,8 @@ func (c *context) LoadBuiltins() {
 	c.LoadFunc("import", c.builtinImport)
 }
 
-func (c *context) builtinType(args []Value) (Value, *runtimeError) {
-	if err := c.requireArgLen("type", args, 1); err != nil {
+func (c *Context) builtinType(args []Value) (Value, *RuntimeError) {
+	if err := c.RequireArgLen("type", args, 1); err != nil {
 		return nil, err
 	}
 
@@ -141,8 +141,8 @@ func (c *context) builtinType(args []Value) (Value, *runtimeError) {
 	panic("Unreachable: unknown runtime value")
 }
 
-func (c *context) builtinInt(args []Value) (Value, *runtimeError) {
-	if err := c.requireArgLen("int", args, 1); err != nil {
+func (c *Context) builtinInt(args []Value) (Value, *RuntimeError) {
+	if err := c.RequireArgLen("int", args, 1); err != nil {
 		return nil, err
 	}
 
@@ -162,8 +162,8 @@ func (c *context) builtinInt(args []Value) (Value, *runtimeError) {
 	}
 }
 
-func (c *context) builtinFloat(args []Value) (Value, *runtimeError) {
-	if err := c.requireArgLen("float", args, 1); err != nil {
+func (c *Context) builtinFloat(args []Value) (Value, *RuntimeError) {
+	if err := c.RequireArgLen("float", args, 1); err != nil {
 		return nil, err
 	}
 
@@ -183,8 +183,8 @@ func (c *context) builtinFloat(args []Value) (Value, *runtimeError) {
 	}
 }
 
-func (c *context) builtinString(args []Value) (Value, *runtimeError) {
-	if err := c.requireArgLen("string", args, 1); err != nil {
+func (c *Context) builtinString(args []Value) (Value, *RuntimeError) {
+	if err := c.RequireArgLen("string", args, 1); err != nil {
 		return nil, err
 	}
 
@@ -202,8 +202,8 @@ func (c *context) builtinString(args []Value) (Value, *runtimeError) {
 	}
 }
 
-func (c *context) builtinLen(args []Value) (Value, *runtimeError) {
-	if err := c.requireArgLen("len", args, 1); err != nil {
+func (c *Context) builtinLen(args []Value) (Value, *RuntimeError) {
+	if err := c.RequireArgLen("len", args, 1); err != nil {
 		return nil, err
 	}
 
@@ -215,13 +215,13 @@ func (c *context) builtinLen(args []Value) (Value, *runtimeError) {
 	case ObjectValue:
 		return IntValue(len(arg)), nil
 	default:
-		return nil, &runtimeError{
-			reason: fmt.Sprintf("%s does not support a len() call", arg),
+		return nil, &RuntimeError{
+			Reason: fmt.Sprintf("%s does not support a len() call", arg),
 		}
 	}
 }
 
-func (c *context) builtinPrint(args []Value) (Value, *runtimeError) {
+func (c *Context) builtinPrint(args []Value) (Value, *RuntimeError) {
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case *StringValue:
@@ -234,24 +234,24 @@ func (c *context) builtinPrint(args []Value) (Value, *runtimeError) {
 	return null, nil
 }
 
-func (c *context) builtinImport(args []Value) (Value, *runtimeError) {
-	if err := c.requireArgLen("import", args, 1); err != nil {
+func (c *Context) builtinImport(args []Value) (Value, *RuntimeError) {
+	if err := c.RequireArgLen("import", args, 1); err != nil {
 		return nil, err
 	}
 	arg, ok := args[0].(*StringValue)
 	if !ok {
-		return nil, &runtimeError{
-			reason: fmt.Sprintf("import requires a string, got %s", args[0]),
+		return nil, &RuntimeError{
+			Reason: fmt.Sprintf("import requires a string, got %s", args[0]),
 		}
 	}
 
 	name := string(*arg)
 
-	if value, ok := c.importMap[name]; ok {
+	if value, ok := c.ImportMap[name]; ok {
 		return value, nil
 	}
 
-	for _, module := range c.modules {
+	for _, module := range c.Modules {
 		if module.name == string(*arg) {
 			value := make(ObjectValue, len(module.items))
 
@@ -260,14 +260,14 @@ func (c *context) builtinImport(args []Value) (Value, *runtimeError) {
 				value[str.HashKey()] = ObjectPair{&str, v}
 			}
 
-			c.importMap[name] = value
+			c.ImportMap[name] = value
 
 			return value, nil
 		}
 	}
 
-	return nil, &runtimeError{
-		reason: fmt.Sprintf("module %s not found", name),
+	return nil, &RuntimeError{
+		Reason: fmt.Sprintf("module %s not found", name),
 	}
 }
 
@@ -276,45 +276,45 @@ type module struct {
 	items map[string]Value
 }
 
-func (c *context) LoadModule(name string, items map[string]Value) {
-	c.modules = append(c.modules, module{
+func (c *Context) LoadModule(name string, items map[string]Value) {
+	c.Modules = append(c.Modules, module{
 		name:  name,
 		items: items,
 	})
 }
 
-func (c *context) LoadModules() {
-	c.LoadModule("math", map[string]Value{
-		"pi": FloatValue(math.Pi),
+func (c *Context) LoadModules() {
+	// c.LoadModule("math", map[string]Value{
+	// 	"pi": FloatValue(math.Pi),
 
-		"ceil": BuiltinFnValue{
-			"ceil",
-			c.mathCeil,
-		},
-		"floor": BuiltinFnValue{
-			"floor",
-			c.mathFloor,
-		},
-		"sin": BuiltinFnValue{
-			"sin",
-			c.mathSin,
-		},
-	})
+	// 	"ceil": BuiltinFnValue{
+	// 		"ceil",
+	// 		c.mathCeil,
+	// 	},
+	// 	"floor": BuiltinFnValue{
+	// 		"floor",
+	// 		c.mathFloor,
+	// 	},
+	// 	"sin": BuiltinFnValue{
+	// 		"sin",
+	// 		c.mathSin,
+	// 	},
+	// })
 
-	c.LoadModule("json", map[string]Value{
-		"parse": BuiltinFnValue{
-			"parse",
-			c.jsonParse,
-		},
-		"serialize": BuiltinFnValue{
-			"serialize",
-			c.jsonSerialize,
-		},
-	})
+	// c.LoadModule("json", map[string]Value{
+	// 	"parse": BuiltinFnValue{
+	// 		"parse",
+	// 		c.jsonParse,
+	// 	},
+	// 	"serialize": BuiltinFnValue{
+	// 		"serialize",
+	// 		c.jsonSerialize,
+	// 	},
+	// })
 }
 
-func (c *context) mathCeil(args []Value) (Value, *runtimeError) {
-	if err := c.requireArgLen("math.ceil", args, 1); err != nil {
+func (c *Context) mathCeil(args []Value) (Value, *RuntimeError) {
+	if err := c.RequireArgLen("math.ceil", args, 1); err != nil {
 		return nil, err
 	}
 
@@ -324,14 +324,14 @@ func (c *context) mathCeil(args []Value) (Value, *runtimeError) {
 	case FloatValue:
 		return IntValue(math.Ceil(float64(arg))), nil
 	default:
-		return nil, &runtimeError{
-			reason: fmt.Sprintf("math.ceil does not support type %s", arg),
+		return nil, &RuntimeError{
+			Reason: fmt.Sprintf("math.ceil does not support type %s", arg),
 		}
 	}
 }
 
-func (c *context) mathFloor(args []Value) (Value, *runtimeError) {
-	if err := c.requireArgLen("math.floor", args, 1); err != nil {
+func (c *Context) mathFloor(args []Value) (Value, *RuntimeError) {
+	if err := c.RequireArgLen("math.floor", args, 1); err != nil {
 		return nil, err
 	}
 
@@ -341,14 +341,14 @@ func (c *context) mathFloor(args []Value) (Value, *runtimeError) {
 	case FloatValue:
 		return IntValue(math.Floor(float64(arg))), nil
 	default:
-		return nil, &runtimeError{
-			reason: fmt.Sprintf("math.floor does not support type %s", arg),
+		return nil, &RuntimeError{
+			Reason: fmt.Sprintf("math.floor does not support type %s", arg),
 		}
 	}
 }
 
-func (c *context) mathSin(args []Value) (Value, *runtimeError) {
-	if err := c.requireArgLen("math.sin", args, 1); err != nil {
+func (c *Context) mathSin(args []Value) (Value, *RuntimeError) {
+	if err := c.RequireArgLen("math.sin", args, 1); err != nil {
 		return nil, err
 	}
 
@@ -358,36 +358,36 @@ func (c *context) mathSin(args []Value) (Value, *runtimeError) {
 	case FloatValue:
 		return FloatValue(math.Sin(float64(arg))), nil
 	default:
-		return nil, &runtimeError{
-			reason: fmt.Sprintf("math.sin does not support type %s", arg),
+		return nil, &RuntimeError{
+			Reason: fmt.Sprintf("math.sin does not support type %s", arg),
 		}
 	}
 }
 
-func (c *context) jsonParse(args []Value) (Value, *runtimeError) {
-	if err := c.requireArgLen("json.parse", args, 1); err != nil {
+func (c *Context) jsonParse(args []Value) (Value, *RuntimeError) {
+	if err := c.RequireArgLen("json.parse", args, 1); err != nil {
 		return nil, err
 	}
 
 	arg, ok := args[0].(*StringValue)
 	if !ok {
-		return nil, &runtimeError{
-			reason: fmt.Sprintf("json.parse requires a string, got %s", args[0]),
+		return nil, &RuntimeError{
+			Reason: fmt.Sprintf("json.parse requires a string, got %s", args[0]),
 		}
 	}
 
 	var data interface{}
 	if err := json.Unmarshal([]byte(*arg), &data); err != nil {
-		return nil, &runtimeError{
-			reason: fmt.Sprintf("json.parse: %s", err),
+		return nil, &RuntimeError{
+			Reason: fmt.Sprintf("json.parse: %s", err),
 		}
 	}
 
 	return c.convertJSON(data), nil
 }
 
-func (c *context) jsonSerialize(args []Value) (Value, *runtimeError) {
-	if err := c.requireArgLen("json.serialize", args, 1); err != nil {
+func (c *Context) jsonSerialize(args []Value) (Value, *RuntimeError) {
+	if err := c.RequireArgLen("json.serialize", args, 1); err != nil {
 		return nil, err
 	}
 
@@ -396,8 +396,8 @@ func (c *context) jsonSerialize(args []Value) (Value, *runtimeError) {
 	builder := bytes.Buffer{}
 	err := c.serializeValue(arg, &builder)
 	if err != nil {
-		return nil, &runtimeError{
-			reason: err.Error(),
+		return nil, &RuntimeError{
+			Reason: err.Error(),
 		}
 	}
 
@@ -406,7 +406,7 @@ func (c *context) jsonSerialize(args []Value) (Value, *runtimeError) {
 	return &value, nil
 }
 
-func (c *context) serializeValue(value Value, builder *bytes.Buffer) *runtimeError {
+func (c *Context) serializeValue(value Value, builder *bytes.Buffer) *RuntimeError {
 	switch value := value.(type) {
 	case NullValue:
 		builder.WriteString("null")
@@ -453,8 +453,8 @@ func (c *context) serializeValue(value Value, builder *bytes.Buffer) *runtimeErr
 			}
 			str, ok := pair.key.(*StringValue)
 			if !ok {
-				return &runtimeError{
-					reason: fmt.Sprintf("json.serialize: unsupported type %s", pair.key),
+				return &RuntimeError{
+					Reason: fmt.Sprintf("json.serialize: unsupported type %s", pair.key),
 				}
 			}
 
@@ -467,14 +467,14 @@ func (c *context) serializeValue(value Value, builder *bytes.Buffer) *runtimeErr
 		}
 		builder.WriteString("}")
 	default:
-		return &runtimeError{
-			reason: fmt.Sprintf("json.serialize: unsupported type %s", value),
+		return &RuntimeError{
+			Reason: fmt.Sprintf("json.serialize: unsupported type %s", value),
 		}
 	}
 	return nil
 }
 
-func (c *context) convertJSON(data interface{}) Value {
+func (c *Context) convertJSON(data interface{}) Value {
 	switch data := data.(type) {
 	case bool:
 		return BoolValue(data)

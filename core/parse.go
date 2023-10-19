@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ func (n stringNode) String() string {
 }
 
 func (n stringNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type intNode struct {
@@ -35,7 +35,7 @@ func (n intNode) String() string {
 }
 
 func (n intNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type floatNode struct {
@@ -48,7 +48,7 @@ func (n floatNode) String() string {
 }
 
 func (n floatNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type nullNode struct {
@@ -60,7 +60,7 @@ func (n nullNode) String() string {
 }
 
 func (n nullNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type boolNode struct {
@@ -73,7 +73,7 @@ func (n boolNode) String() string {
 }
 
 func (n boolNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type listNode struct {
@@ -91,7 +91,7 @@ func (n listNode) String() string {
 }
 
 func (n listNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type fnNode struct {
@@ -105,7 +105,7 @@ func (n fnNode) String() string {
 }
 
 func (n fnNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type objectEntry struct {
@@ -130,7 +130,7 @@ func (n objectNode) String() string {
 	return "{ " + strings.Join(entryStrings, ", ") + " }"
 }
 func (n objectNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type identifierNode struct {
@@ -142,7 +142,7 @@ func (n identifierNode) String() string {
 	return n.payload
 }
 func (n identifierNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type assignmentNode struct {
@@ -160,7 +160,7 @@ func (n assignmentNode) String() string {
 }
 
 func (n assignmentNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type propertyAccessNode struct {
@@ -173,7 +173,7 @@ func (n propertyAccessNode) String() string {
 	return "(" + n.left.String() + "." + n.right.String() + ")"
 }
 func (n propertyAccessNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type unaryNode struct {
@@ -183,11 +183,11 @@ type unaryNode struct {
 }
 
 func (n unaryNode) String() string {
-	opTok := token{kind: n.op}
+	opTok := token{Kind: n.op}
 	return opTok.String() + n.right.String()
 }
 func (n unaryNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type binaryNode struct {
@@ -198,11 +198,11 @@ type binaryNode struct {
 }
 
 func (n binaryNode) String() string {
-	opTok := token{kind: n.op}
+	opTok := token{Kind: n.op}
 	return "(" + n.left.String() + " " + opTok.String() + " " + n.right.String() + ")"
 }
 func (n binaryNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type fnCallNode struct {
@@ -220,7 +220,7 @@ func (n fnCallNode) String() string {
 	return fmt.Sprintf("%s(%s)", n.fn, strings.Join(argStrings, ", "))
 }
 func (n fnCallNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type ifExprNode struct {
@@ -238,7 +238,7 @@ func (n ifExprNode) String() string {
 }
 
 func (n ifExprNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type forExprNode struct {
@@ -252,7 +252,7 @@ func (n forExprNode) String() string {
 }
 
 func (n forExprNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type returnNode struct {
@@ -265,7 +265,7 @@ func (r returnNode) String() string {
 }
 
 func (r returnNode) pos() position {
-	return r.tok.pos
+	return r.tok.Pos
 }
 
 type blockNode struct {
@@ -282,7 +282,7 @@ func (n blockNode) String() string {
 }
 
 func (n blockNode) pos() position {
-	return n.tok.pos
+	return n.tok.Pos
 }
 
 type parser struct {
@@ -345,20 +345,20 @@ func (p *parser) back() {
 }
 
 func (p *parser) expect(kind tokenKind) (token, error) {
-	tok := token{kind: kind}
+	tok := token{Kind: kind}
 
 	if p.isEOF() {
-		return token{kind: unknown}, parseError{
+		return token{Kind: UNKNOWN}, parseError{
 			reason: fmt.Sprintf("Unexpected end of input, expected %s", tok),
-			pos:    tok.pos,
+			pos:    tok.Pos,
 		}
 	}
 
 	next := p.next()
-	if next.kind != kind {
-		return token{kind: unknown}, parseError{
+	if next.Kind != kind {
+		return token{Kind: UNKNOWN}, parseError{
 			reason: fmt.Sprintf("Unexpected token\x1b[34;1m%s\x1b[0;0m, expected %s", next, tok),
-			pos:    next.pos,
+			pos:    next.Pos,
 		}
 	}
 
@@ -367,21 +367,21 @@ func (p *parser) expect(kind tokenKind) (token, error) {
 
 func (p *parser) readUntil(kind tokenKind) []token {
 	tokens := []token{}
-	for !p.isEOF() && p.peek().kind != kind {
+	for !p.isEOF() && p.peek().Kind != kind {
 		tokens = append(tokens, p.next())
 	}
 	return tokens
 }
 
 func (p *parser) parseAssignment(left astNode) (astNode, error) {
-	if p.peek().kind != assign &&
-		p.peek().kind != set {
+	if p.peek().Kind != ASSIGN &&
+		p.peek().Kind != SET {
 		return left, nil
 	}
 
 	next := p.next()
 	node := assignmentNode{
-		isSet: next.kind != assign,
+		isSet: next.Kind != ASSIGN,
 		left:  left,
 		tok:   &next,
 	}
@@ -406,8 +406,8 @@ func (p *parser) parseSubNode() (astNode, error) {
 	}
 
 	for !p.isEOF() {
-		switch p.peek().kind {
-		case dot:
+		switch p.peek().Kind {
+		case DOT:
 			next := p.next()
 			right, err := p.parseUnit()
 			if err != nil {
@@ -415,11 +415,11 @@ func (p *parser) parseSubNode() (astNode, error) {
 			}
 
 			node = propertyAccessNode{left: node, right: right, tok: &next}
-		case leftParen:
+		case LEFT_PAREN:
 			next := p.next()
 			args := []astNode{}
 
-			for !p.isEOF() && p.peek().kind != rightParen {
+			for !p.isEOF() && p.peek().Kind != RIGHT_PAREN {
 				arg, err := p.parseNode()
 				if err != nil {
 					return nil, err
@@ -427,12 +427,12 @@ func (p *parser) parseSubNode() (astNode, error) {
 
 				args = append(args, arg)
 
-				if _, err = p.expect(comma); err != nil {
+				if _, err = p.expect(COMMA); err != nil {
 					return nil, err
 				}
 			}
 
-			if _, err := p.expect(rightParen); err != nil {
+			if _, err := p.expect(RIGHT_PAREN); err != nil {
 				return nil, err
 			}
 
@@ -455,22 +455,22 @@ func (p *parser) parseNode() (astNode, error) {
 		return nil, err
 	}
 
-	for !p.isEOF() && p.peek().kind != comma {
-		switch p.peek().kind {
-		case assign, set:
+	for !p.isEOF() && p.peek().Kind != COMMA {
+		switch p.peek().Kind {
+		case ASSIGN, SET:
 			return p.parseAssignment(node)
-		case plus, minus, times, divide, modulus, and, or, greater, less, eq, geq, leq, neq, dotdot, inKeyword:
+		case PLUS, MINUS, TIMES, DIVIDE, MODULUS, AND, OR, GREATER, LESS, EQ, GEQ, LEQ, NEQ, DOTDOT, IN_KEYWORD:
 			minPrec := p.lastMinPrec()
 			for {
 				if p.isEOF() {
 					return nil, parseError{
 						reason: "Incomplete binary expression",
-						pos:    p.peek().pos,
+						pos:    p.peek().Pos,
 					}
 				}
 
 				peeked := p.peek()
-				op := peeked.kind
+				op := peeked.Kind
 				prec := infixOpPrecedence(op)
 				if prec <= minPrec {
 					break
@@ -479,8 +479,8 @@ func (p *parser) parseNode() (astNode, error) {
 
 				if p.isEOF() {
 					return nil, parseError{
-						reason: fmt.Sprintf("Incomplete binary expression with %s", token{kind: op}),
-						pos:    p.peek().pos,
+						reason: fmt.Sprintf("Incomplete binary expression with %s", token{Kind: op}),
+						pos:    p.peek().Pos,
 					}
 				}
 
@@ -510,25 +510,25 @@ func (p *parser) parseNode() (astNode, error) {
 
 func infixOpPrecedence(op tokenKind) int {
 	switch op {
-	case modulus:
+	case MODULUS:
 		return 80
-	case times, divide:
+	case TIMES, DIVIDE:
 		return 50
-	case plus, minus:
+	case PLUS, MINUS:
 		return 45
-	case inKeyword:
+	case IN_KEYWORD:
 		return 40
-	case less, greater, leq, geq:
+	case LESS, GREATER, LEQ, GEQ:
 		return 35
-	case eq, neq:
+	case EQ, NEQ:
 		return 30
-	case and:
+	case AND:
 		return 20
 	// case xor:
 	// 	return 15
-	case or:
+	case OR:
 		return 10
-	case dotdot:
+	case DOTDOT:
 		return 5
 	default:
 		return -1
@@ -539,65 +539,65 @@ func infixOpPrecedence(op tokenKind) int {
 // literals, function literals, grouped expresssiions, etc.
 func (p *parser) parseUnit() (astNode, error) {
 	tok := p.next()
-	switch tok.kind {
-	case stringLiteral:
+	switch tok.Kind {
+	case STRING_LITERAL:
 		return p.parseString(tok)
-	case numberLiteral:
+	case NUMBER_LITERAL:
 		return p.parseNumber(tok)
-	case trueLiteral:
+	case TRUE_LITERAL:
 		return boolNode{payload: true, tok: &tok}, nil
-	case falseLiteral:
+	case FALSE_LITERAL:
 		return boolNode{payload: false, tok: &tok}, nil
-	case nullLiteral:
+	case NULL_LITERAL:
 		return nullNode{tok: &tok}, nil
-	case returnKeyword:
+	case RETURN_KEYWORD:
 		node, err := p.parseNode()
 		if err != nil {
 			return nil, err
 		}
 
 		return returnNode{inner: node, tok: &tok}, nil
-	case identifier:
-		if p.peek().kind == singleArrow {
+	case IDENTIFIER:
+		if p.peek().Kind == SINGLE_ARROW {
 			return p.parseFunctionLiteral(tok)
 		} else {
-			return identifierNode{payload: tok.payload, tok: &tok}, nil
+			return identifierNode{payload: tok.Payload, tok: &tok}, nil
 		}
-	case minus, not:
+	case MINUS, NOT:
 		right, err := p.parseSubNode()
 		if err != nil {
 			return nil, err
 		}
 
-		return unaryNode{op: tok.kind, right: right, tok: &tok}, nil
-	case leftBracket:
+		return unaryNode{op: tok.Kind, right: right, tok: &tok}, nil
+	case LEFT_BRACKET:
 		p.pushMinPrec(0)
 		defer p.popMinPrec()
 
 		nodes := []astNode{}
-		for !p.isEOF() && p.peek().kind != rightBracket {
+		for !p.isEOF() && p.peek().Kind != RIGHT_BRACKET {
 			node, err := p.parseNode()
 			if err != nil {
 				return nil, err
 			}
-			if _, err := p.expect(comma); err != nil {
+			if _, err := p.expect(COMMA); err != nil {
 				return nil, err
 			}
 
 			nodes = append(nodes, node)
 		}
 
-		if _, err := p.expect(rightBracket); err != nil {
+		if _, err := p.expect(RIGHT_BRACKET); err != nil {
 			return nil, err
 		}
 
 		return listNode{items: nodes, tok: &tok}, nil
-	case leftBrace:
+	case LEFT_BRACE:
 		p.pushMinPrec(0)
 		defer p.popMinPrec()
 
 		// empty {} is an empty object
-		if p.peek().kind == rightBrace {
+		if p.peek().Kind == RIGHT_BRACE {
 			p.next()
 			return objectNode{entries: []objectEntry{}, tok: &tok}, nil
 		}
@@ -610,11 +610,11 @@ func (p *parser) parseUnit() (astNode, error) {
 		if p.isEOF() {
 			return nil, parseError{
 				reason: fmt.Sprintf("Unexpected end of input inside block or object"),
-				pos:    tok.pos,
+				pos:    tok.Pos,
 			}
 		}
 
-		if p.peek().kind == colon {
+		if p.peek().Kind == COLON {
 			// it's an object
 			p.next()
 			valExpr, err := p.parseNode()
@@ -622,7 +622,7 @@ func (p *parser) parseUnit() (astNode, error) {
 			if err != nil {
 				return nil, err
 			}
-			if _, err := p.expect(comma); err != nil {
+			if _, err := p.expect(COMMA); err != nil {
 				return nil, err
 			}
 
@@ -630,12 +630,12 @@ func (p *parser) parseUnit() (astNode, error) {
 				{key: firstExpr, val: valExpr},
 			}
 
-			for !p.isEOF() && p.peek().kind != rightBrace {
+			for !p.isEOF() && p.peek().Kind != RIGHT_BRACE {
 				key, err := p.parseNode()
 				if err != nil {
 					return nil, err
 				}
-				if _, err := p.expect(colon); err != nil {
+				if _, err := p.expect(COLON); err != nil {
 					return nil, err
 				}
 
@@ -643,7 +643,7 @@ func (p *parser) parseUnit() (astNode, error) {
 				if err != nil {
 					return nil, err
 				}
-				if _, err := p.expect(comma); err != nil {
+				if _, err := p.expect(COMMA); err != nil {
 					return nil, err
 				}
 
@@ -653,7 +653,7 @@ func (p *parser) parseUnit() (astNode, error) {
 				})
 			}
 
-			if _, err := p.expect(rightBrace); err != nil {
+			if _, err := p.expect(RIGHT_BRACE); err != nil {
 				return nil, err
 			}
 
@@ -661,28 +661,28 @@ func (p *parser) parseUnit() (astNode, error) {
 		}
 
 		exprs := []astNode{firstExpr}
-		if _, err := p.expect(comma); err != nil {
+		if _, err := p.expect(COMMA); err != nil {
 			return nil, err
 		}
 
-		for !p.isEOF() && p.peek().kind != rightBrace {
+		for !p.isEOF() && p.peek().Kind != RIGHT_BRACE {
 			expr, err := p.parseNode()
 			if err != nil {
 				return nil, err
 			}
-			if _, err := p.expect(comma); err != nil {
+			if _, err := p.expect(COMMA); err != nil {
 				return nil, err
 			}
 
 			exprs = append(exprs, expr)
 		}
-		if _, err := p.expect(rightBrace); err != nil {
+		if _, err := p.expect(RIGHT_BRACE); err != nil {
 			return nil, err
 		}
 
 		return blockNode{exprs: exprs, tok: &tok}, nil
 
-	case leftParen:
+	case LEFT_PAREN:
 		// can be grouped expression or function literal
 		p.pushMinPrec(0)
 		defer p.popMinPrec()
@@ -690,29 +690,29 @@ func (p *parser) parseUnit() (astNode, error) {
 		startIndex := p.index - 1
 		exprs := []astNode{}
 
-		for !p.isEOF() && p.peek().kind != rightParen {
+		for !p.isEOF() && p.peek().Kind != RIGHT_PAREN {
 			expr, err := p.parseNode()
 			if err != nil {
 				return nil, err
 			}
-			if _, err := p.expect(comma); err != nil {
+			if _, err := p.expect(COMMA); err != nil {
 				return nil, err
 			}
 
 			exprs = append(exprs, expr)
 		}
 
-		if _, err := p.expect(rightParen); err != nil {
+		if _, err := p.expect(RIGHT_PAREN); err != nil {
 			return nil, err
 		}
 
-		if p.peek().kind == singleArrow {
+		if p.peek().Kind == SINGLE_ARROW {
 			p.index = startIndex // backtrack to the start of the parens
 			return p.parseFunctionLiteral(tok)
 		}
 
 		return blockNode{exprs: exprs, tok: &tok}, nil
-	case forKeyword:
+	case FOR_KEYWORD:
 		p.pushMinPrec(0)
 		defer p.popMinPrec()
 
@@ -722,10 +722,10 @@ func (p *parser) parseUnit() (astNode, error) {
 			return nil, err
 		}
 
-		if p.peek().kind != leftBrace {
+		if p.peek().Kind != LEFT_BRACE {
 			return nil, parseError{
 				reason: fmt.Sprintf("Expected block after for loop condition"),
-				pos:    p.peek().pos,
+				pos:    p.peek().Pos,
 			}
 		}
 
@@ -755,7 +755,7 @@ func (p *parser) parseUnit() (astNode, error) {
 		// 	}
 		// }
 
-	case ifKeyword:
+	case IF_KEYWORD:
 		p.pushMinPrec(0)
 		defer p.popMinPrec()
 
@@ -764,10 +764,10 @@ func (p *parser) parseUnit() (astNode, error) {
 			return nil, err
 		}
 
-		if p.peek().kind != leftBrace {
+		if p.peek().Kind != LEFT_BRACE {
 			return nil, parseError{
 				reason: fmt.Sprintf("Expected block after if condition"),
-				pos:    p.peek().pos,
+				pos:    p.peek().Pos,
 			}
 		}
 
@@ -776,7 +776,7 @@ func (p *parser) parseUnit() (astNode, error) {
 			return nil, err
 		}
 
-		if p.peek().kind == elseKeyword {
+		if p.peek().Kind == ELSE_KEYWORD {
 			p.next()
 			else_, err := p.parseNode()
 			if err != nil {
@@ -790,7 +790,7 @@ func (p *parser) parseUnit() (astNode, error) {
 
 	return nil, parseError{
 		reason: fmt.Sprintf("Unexpected token %s at start of unit", tok),
-		pos:    tok.pos,
+		pos:    tok.Pos,
 	}
 }
 
@@ -808,29 +808,29 @@ func (p *parser) parseFunctionLiteral(tok token) (astNode, error) {
 	args := []string{}
 
 	// parse args
-	if tok.kind == identifier {
-		args = append(args, tok.payload)
-	} else if tok.kind == leftParen {
+	if tok.Kind == IDENTIFIER {
+		args = append(args, tok.Payload)
+	} else if tok.Kind == LEFT_PAREN {
 		p.next() // eat the left paren
-		for !p.isEOF() && p.peek().kind != rightParen {
-			arg, err := p.expect(identifier)
+		for !p.isEOF() && p.peek().Kind != RIGHT_PAREN {
+			arg, err := p.expect(IDENTIFIER)
 			if err != nil {
 				return nil, err
 			}
-			args = append(args, arg.payload)
+			args = append(args, arg.Payload)
 
-			if _, err := p.expect(comma); err != nil {
+			if _, err := p.expect(COMMA); err != nil {
 				return nil, err
 			}
 		}
 
-		if _, err := p.expect(rightParen); err != nil {
+		if _, err := p.expect(RIGHT_PAREN); err != nil {
 			return nil, err
 		}
 	}
 
 	// invariant
-	if _, err := p.expect(singleArrow); err != nil {
+	if _, err := p.expect(SINGLE_ARROW); err != nil {
 		return nil, err
 	}
 
@@ -848,7 +848,7 @@ func (p *parser) parseFunctionLiteral(tok token) (astNode, error) {
 
 func (p *parser) parseString(tok token) (astNode, error) {
 	builder := bytes.Buffer{}
-	runes := []rune(tok.payload)
+	runes := []rune(tok.Payload)
 
 	for i := 0; i < len(runes); i++ {
 		ch := runes[i]
@@ -896,19 +896,19 @@ func (p *parser) parseString(tok token) (astNode, error) {
 }
 
 func (p *parser) parseNumber(tok token) (astNode, error) {
-	if strings.ContainsRune(tok.payload, '.') {
-		f, err := strconv.ParseFloat(tok.payload, 64)
+	if strings.ContainsRune(tok.Payload, '.') {
+		f, err := strconv.ParseFloat(tok.Payload, 64)
 		if err != nil {
-			return nil, parseError{reason: err.Error(), pos: tok.pos}
+			return nil, parseError{reason: err.Error(), pos: tok.Pos}
 		}
 		return floatNode{
 			payload: f,
 			tok:     &tok,
 		}, nil
 	}
-	n, err := strconv.ParseInt(tok.payload, 10, 64)
+	n, err := strconv.ParseInt(tok.Payload, 10, 64)
 	if err != nil {
-		return nil, parseError{reason: err.Error(), pos: tok.pos}
+		return nil, parseError{reason: err.Error(), pos: tok.Pos}
 	}
 	return intNode{
 		payload: n,
@@ -925,7 +925,7 @@ func (p *parser) parse() ([]astNode, error) {
 			return nodes, err
 		}
 
-		if _, err = p.expect(comma); err != nil {
+		if _, err = p.expect(COMMA); err != nil {
 			return nodes, err
 		}
 

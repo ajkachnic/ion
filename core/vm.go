@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"encoding/binary"
@@ -24,7 +24,7 @@ func (f *Frame) instructions() Instructions {
 }
 
 type VM struct {
-	constants []Value
+	Constants []Value
 	globals   []Value
 
 	stack []Value
@@ -33,11 +33,11 @@ type VM struct {
 	frames      []*Frame
 	framesIndex int
 
-	context *context
+	context *Context
 }
 
-func NewVM(bytecode *Bytecode, globals []Value, context *context) *VM {
-	mainFn := &FunctionValue{instructions: bytecode.instructions}
+func NewVM(bytecode *Bytecode, globals []Value, context *Context) *VM {
+	mainFn := &FunctionValue{instructions: bytecode.Instructions}
 	mainClosure := &Closure{fn: mainFn}
 	mainFrame := newFrame(mainClosure, 0)
 
@@ -45,7 +45,7 @@ func NewVM(bytecode *Bytecode, globals []Value, context *context) *VM {
 	frames[0] = mainFrame
 
 	return &VM{
-		constants: bytecode.constants,
+		Constants: bytecode.Constants,
 		globals:   globals,
 
 		frames:      frames,
@@ -93,7 +93,7 @@ func (vm *VM) peek() Value {
 	return v
 }
 
-func (vm *VM) run() error {
+func (vm *VM) Run() error {
 	var ip int
 	var ins Instructions
 	var op Opcode
@@ -109,7 +109,7 @@ func (vm *VM) run() error {
 		case OpConstant:
 			constIndex := int(vm.readU16(true))
 
-			if err := vm.push(vm.constants[constIndex]); err != nil {
+			if err := vm.push(vm.Constants[constIndex]); err != nil {
 				return err
 			}
 		case OpTrue:
@@ -231,7 +231,7 @@ func (vm *VM) run() error {
 		case OpGetBuiltin:
 			builtinIndex := int(vm.readU8(true))
 
-			definition := vm.context.builtins[builtinIndex]
+			definition := vm.context.Builtins[builtinIndex]
 
 			if err := vm.push(definition); err != nil {
 				return err
@@ -299,7 +299,7 @@ func (vm *VM) readU8(increment bool) uint8 {
 }
 
 func (vm *VM) pushClosure(constIndex int, numFree int) error {
-	constant := vm.constants[constIndex]
+	constant := vm.Constants[constIndex]
 	function, ok := constant.(FunctionValue)
 	if !ok {
 		return fmt.Errorf("not a function: %+v", constant)
@@ -322,7 +322,7 @@ func (vm *VM) executeCall(numArgs int) error {
 		return vm.callClosure(callee, numArgs)
 	case BuiltinFnValue:
 		args := vm.stack[vm.sp-numArgs : vm.sp]
-		result, err := (callee.fn)(args)
+		result, err := (callee.Fn)(args)
 
 		if err != nil {
 			return err
@@ -548,6 +548,6 @@ func (vm *VM) buildObject(start int, end int) (Value, error) {
 	return ObjectValue(pairs), nil
 }
 
-func (vm *VM) lastPoppedStackElem() Value {
+func (vm *VM) LastPoppedStackElem() Value {
 	return vm.stack[vm.sp]
 }

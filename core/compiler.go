@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"fmt"
@@ -86,7 +86,7 @@ func NewEnclosedSymbolTable(outer *SymbolTable) *SymbolTable {
 	return s
 }
 
-func (s *SymbolTable) define(name string) Symbol {
+func (s *SymbolTable) Define(name string) Symbol {
 	symbol := Symbol{name: name, index: len(s.store)}
 	if s.outer == nil {
 		symbol.scope = GlobalScope
@@ -98,7 +98,7 @@ func (s *SymbolTable) define(name string) Symbol {
 	return symbol
 }
 
-func (s *SymbolTable) defineBuiltin(index int, name string) Symbol {
+func (s *SymbolTable) DefineBuiltin(index int, name string) Symbol {
 	symbol := Symbol{name: name, index: index, scope: BuiltinScope}
 	s.store[name] = symbol
 	return symbol
@@ -154,8 +154,8 @@ func (c *Compiler) loadSymbol(s Symbol) {
 }
 
 type Bytecode struct {
-	instructions Instructions
-	constants    []Value
+	Instructions Instructions
+	Constants    []Value
 }
 
 type Compiler struct {
@@ -171,7 +171,7 @@ type emittedInstruction struct {
 	position int
 }
 
-func NewCompiler(context *context) Compiler {
+func NewCompiler(context *Context) Compiler {
 	scope := CompilationScope{
 		instructions:        Instructions{},
 		lastInstruction:     emittedInstruction{},
@@ -180,8 +180,8 @@ func NewCompiler(context *context) Compiler {
 
 	symbolTable := NewSymbolTable()
 
-	for i, builtin := range context.builtins {
-		symbolTable.defineBuiltin(i, builtin.name)
+	for i, builtin := range context.Builtins {
+		symbolTable.DefineBuiltin(i, builtin.Name)
 	}
 
 	return Compiler{
@@ -192,10 +192,10 @@ func NewCompiler(context *context) Compiler {
 	}
 }
 
-func (c *Compiler) bytecode() *Bytecode {
+func (c *Compiler) Bytecode() *Bytecode {
 	return &Bytecode{
-		instructions: c.currentInstructions(),
-		constants:    c.constants,
+		Instructions: c.currentInstructions(),
+		Constants:    c.constants,
 	}
 }
 
@@ -253,7 +253,7 @@ func (c *Compiler) compile(node astNode, topLevel bool) *compileError {
 		switch cond := node.cond.(type) {
 		case binaryNode:
 			// iterator loop
-			if cond.op == inKeyword {
+			if cond.op == IN_KEYWORD {
 				return c.compileInLoop(node, cond)
 			} else {
 				if err := c.compile(cond, false); err != nil {
@@ -341,7 +341,7 @@ func (c *Compiler) compile(node astNode, topLevel bool) *compileError {
 		c.enterScope()
 
 		for _, p := range node.params {
-			c.symbolTable.define(p)
+			c.symbolTable.Define(p)
 		}
 
 		if err := c.compile(node.body, true); err != nil {
@@ -395,29 +395,29 @@ func (c *Compiler) compile(node astNode, topLevel bool) *compileError {
 		}
 
 		switch node.op {
-		case plus:
+		case PLUS:
 			c.emit(OpAdd)
-		case minus:
+		case MINUS:
 			c.emit(OpSub)
-		case divide:
+		case DIVIDE:
 			c.emit(OpDiv)
-		case times:
+		case TIMES:
 			c.emit(OpMul)
-		case eq:
+		case EQ:
 			c.emit(OpEq)
-		case neq:
+		case NEQ:
 			c.emit(OpNotEq)
-		case less:
+		case LESS:
 			c.emit(OpLess)
-		case greater:
+		case GREATER:
 			c.emit(OpGreater)
-		case leq:
+		case LEQ:
 			c.emit(OpLeq)
-		case geq:
+		case GEQ:
 			c.emit(OpGeq)
 		default:
 			return &compileError{
-				reason:   fmt.Sprintf("unknown operator %s", token{kind: node.op}),
+				reason:   fmt.Sprintf("unknown operator %s", token{Kind: node.op}),
 				position: node.pos(),
 			}
 		}
@@ -427,13 +427,13 @@ func (c *Compiler) compile(node astNode, topLevel bool) *compileError {
 		}
 
 		switch node.op {
-		case minus:
+		case MINUS:
 			c.emit(OpNegate)
-		case not:
+		case NOT:
 			c.emit(OpNot)
 		default:
 			return &compileError{
-				reason:   fmt.Sprintf("unknown unary operator: %s", token{kind: node.op}),
+				reason:   fmt.Sprintf("unknown unary operator: %s", token{Kind: node.op}),
 				position: node.pos(),
 			}
 		}
@@ -457,7 +457,7 @@ func (c *Compiler) compile(node astNode, topLevel bool) *compileError {
 				symbol = stored
 			} else {
 				// we need to define the symbol before compiling the right side (recursion)
-				symbol = c.symbolTable.define(left.payload)
+				symbol = c.symbolTable.Define(left.payload)
 			}
 
 			if err := c.compile(node.right, false); err != nil {
@@ -590,7 +590,7 @@ func (c *Compiler) compileInLoop(node forExprNode, cond binaryNode) *compileErro
 		}
 	}
 
-	symbol := c.symbolTable.define(name.payload)
+	symbol := c.symbolTable.Define(name.payload)
 
 	// actual iterator
 	if err := c.compile(cond.right, false); err != nil {
